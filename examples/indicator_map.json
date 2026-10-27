@@ -1,0 +1,35 @@
+{
+  "class_match": [
+    "feature_absence",
+    "responsibility_split_merge"
+  ],
+  "method_match": [
+    "feature_absence",
+    "responsibility_split_merge"
+  ],
+  "method_jaccard": [
+    "role_changed"
+  ],
+  "field_jaccard": [
+    "role_changed"
+  ],
+  "n_relocated": [
+    "responsibility_split_merge"
+  ],
+  "collab_jaccard": [
+    "collaboration_changed"
+  ],
+  "contract": [
+    "api_contract_redesign"
+  ],
+  "unresolved_ratio": [
+    "missing_replaced_abstraction",
+    "api_contract_redesign"
+  ],
+  "supertypes_changed": [
+    "missing_replaced_abstraction"
+  ],
+  "relocation": [
+    "cross_layer_relocation"
+  ]
+}

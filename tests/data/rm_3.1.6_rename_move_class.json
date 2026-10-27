@@ -1,0 +1,69 @@
+{
+"commits": [
+{
+	"repository": "",
+	"sha1": "ccc53b87c6721386c6de947a2ad7e918a88b3b65",
+	"url": "",
+	"refactorings": [{
+	"type": "Rename Method",
+	"description": "Rename Method public flush(timeout int) : void renamed to public flushAll(timeout int) : void in class com.shop.OrderService",
+	"leftSideLocations": [{
+		"filePath": "src/main/java/com/shop/OrderService.java",
+		"startLine": 9,
+		"endLine": 11,
+		"startColumn": 5,
+		"endColumn": 6,
+		"codeElementType": "METHOD_DECLARATION",
+		"description": "original method declaration",
+		"codeElement": "public flush(timeout int) : void"
+}],
+	"rightSideLocations": [{
+		"filePath": "src/main/java/com/shop/OrderService.java",
+		"startLine": 9,
+		"endLine": 11,
+		"startColumn": 5,
+		"endColumn": 6,
+		"codeElementType": "METHOD_DECLARATION",
+		"description": "renamed method declaration",
+		"codeElement": "public flushAll(timeout int) : void"
+}]
+}
+]
+},
+{
+	"repository": "",
+	"sha1": "7e056f000ca7e988f790a76ebadcf86370471f78",
+	"url": "",
+	"refactorings": [{
+	"type": "Move Class",
+	"description": "Move Class com.shop.Writer moved to com.shop.io.Writer",
+	"leftSideLocations": [{
+		"filePath": "src/main/java/com/shop/Writer.java",
+		"startLine": 3,
+		"endLine": 7,
+		"startColumn": 0,
+		"endColumn": 2,
+		"codeElementType": "TYPE_DECLARATION",
+		"description": "original type declaration",
+		"codeElement": "com.shop.Writer"
+}],
+	"rightSideLocations": [{
+		"filePath": "src/main/java/com/shop/io/Writer.java",
+		"startLine": 3,
+		"endLine": 7,
+		"startColumn": 0,
+		"endColumn": 2,
+		"codeElementType": "TYPE_DECLARATION",
+		"description": "moved type declaration",
+		"codeElement": "com.shop.io.Writer"
+}]
+}
+]
+},
+{
+	"repository": "",
+	"sha1": "5b94db715ba7b83be19b23a2d5dbe94cdbbb267c",
+	"url": "",
+	"refactorings": []
+}]
+}

@@ -1,0 +1,7 @@
+# Exact development tool versions used for the v0.1.0 test run.
+-r requirements.lock
+pytest==9.1.1
+pytest-cov==7.1.0
+coverage==7.17.0
+ruff==0.17.2
+mypy==2.4.0
