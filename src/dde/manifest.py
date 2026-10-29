@@ -37,6 +37,15 @@ _OUTCOME_COLUMN = re.compile(
 )
 _ALLOWED_DESPITE_PATTERN = frozenset({"repatch_target_sha"})
 
+# Vocabulary of the manifest's decision columns. dde runs only ``eligible`` cases;
+# the rest is written by dde-prep and kept for the audit trail.
+ELIGIBILITY_VALUES = ("eligible", "characterization_only", "excluded", "pending")
+EXCLUSION_REASONS = (
+    "duplicate_mo", "no_repatch_case", "target_sha_unknown", "sha_not_in_repository",
+    "fix_already_in_target", "mo_file_not_in_patch", "no_java_mo_file", "history_unavailable",
+    "other",
+)
+
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
@@ -124,3 +133,24 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: fh.read(1 << 16), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def read_rows(path: Path) -> list[dict[str, str]]:
+    """The manifest as plain rows, extra columns kept (for tools that edit it)."""
+    with path.open(newline="", encoding="utf-8") as fh:
+        return [{k: (v or "").strip() for k, v in r.items()} for r in csv.DictReader(fh)]
+
+
+def write_manifest(path: Path, rows: list[dict[str, str]]) -> None:
+    """Write rows with the required columns first; refuse outcome-like columns (R3)."""
+    columns = list(REQUIRED_COLUMNS)
+    for r in rows:
+        columns += [k for k in r if k not in columns]
+    leaking = outcome_like_columns(columns)
+    if leaking:
+        raise ManifestError(f"refusing to write outcome-like columns: {', '.join(leaking)}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=columns, lineterminator="\n", restval="")
+        w.writeheader()
+        w.writerows(rows)

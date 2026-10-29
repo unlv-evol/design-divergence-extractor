@@ -114,31 +114,14 @@ class CaseResult:
 # ---------------------------------------------------------------------------------
 
 
-def verify_case(case: Case, settings: Settings, check_fix: bool = False) -> CaseResult:
-    """Stage 1 plus the patch-level file check.
-
-    With ``check_fix``, also raise ``fix_possibly_present`` (Stage A re-verification of MO
-    status at the target SHA). Files are matched by path or unique file name only, since
-    rename maps need RefactoringMiner; ``extract`` repeats the check with rename maps.
-    """
+def verify_case(case: Case, settings: Settings) -> CaseResult:
+    """Stage 1 plus the patch-level file check."""
     res = CaseResult(case)
     repo = Repo(settings.repos_dir / case.variant_pair)
     res.revisions, flags = verify_revisions(case, repo)
     res.flags.extend(flags)
     if res.revisions is not None:
         _check_diff_files(res, repo, res.revisions)
-        if check_fix and not res.stopped:
-            rev = res.revisions
-            target = TargetTree(repo, rev.target_pre)
-            identity = RenameMaps()
-            mo = set(case.mo_files)
-            for fp in parse_unified_diff(repo.diff(rev.source_pre, rev.source_post)):
-                if fp.path in mo:
-                    fm = match_file(fp.path, identity, identity, target)
-                    if fm.target_path is None:
-                        res.flag("revisions", "mo_file_without_target_counterpart",
-                                 f"{fp.path}: {fm.how}")
-                    _flag_fix_present(res, fp, target, fm)
     return res
 
 
@@ -548,17 +531,27 @@ def _summary(cls: Any) -> str:
 _TRIVIAL = frozenset("{}();,")
 
 
-def _flag_fix_present(res: CaseResult, fp: FilePatch, target: TargetTree, fm: FileMatch) -> None:
-    """``fix_possibly_present``: every substantive added line already in the target file."""
+def fix_possibly_present(fp: FilePatch, target: TargetTree, fm: FileMatch) -> str | None:
+    """Detail text when every substantive added line of ``fp`` is already in the target file.
+
+    Substantive: longer than three characters, not only punctuation, not a comment or import.
+    Public because ``dde-prep`` uses the same rule for Stage A re-verification.
+    """
     if fm.target_path is None:
-        return
+        return None
     text = target.text(fm.target_path)
     if text is None:
-        return
+        return None
     have = {ln.strip() for ln in text.splitlines()}
     added = [t.strip() for h in fp.hunks for t in h.added_texts]
     substantive = [t for t in added if len(t) > 3 and not set(t) <= _TRIVIAL
                    and not t.startswith(("//", "*", "/*", "import "))]
     if substantive and all(t in have for t in substantive):
-        res.flag("revisions", "fix_possibly_present",
-                 f"{fp.path}: all {len(substantive)} added lines found in {fm.target_path}")
+        return f"{fp.path}: all {len(substantive)} added lines found in {fm.target_path}"
+    return None
+
+
+def _flag_fix_present(res: CaseResult, fp: FilePatch, target: TargetTree, fm: FileMatch) -> None:
+    detail = fix_possibly_present(fp, target, fm)
+    if detail:
+        res.flag("revisions", "fix_possibly_present", detail)

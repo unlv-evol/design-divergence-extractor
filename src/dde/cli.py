@@ -39,9 +39,6 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--log-level", default="INFO")
     sub = ap.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("setup-repos", help="create per-pair working repositories (network)")
-    p.add_argument("--manifest", type=Path, required=True)
-    p.add_argument("--repos", type=Path, required=True)
 
     p = sub.add_parser("verify", help="stage 1 only: check revisions and patch files")
     _add_case_args(p)
@@ -69,9 +66,6 @@ def build_parser() -> argparse.ArgumentParser:
                    help="coder whose labels to use, if codes has a coder column")
     p.add_argument("--map", type=Path, default=None, help="JSON indicator -> codes map")
 
-    p = sub.add_parser("gacpd-manifest", help="draft cases.csv from a GACPD run (Stage A helper)")
-    p.add_argument("--gacpd-run", type=Path, required=True)
-    p.add_argument("--out", type=Path, default=Path("cases.draft.csv"))
     return ap
 
 
@@ -112,15 +106,6 @@ def main(argv: list[str] | None = None) -> int:
 
 def _dispatch(args: argparse.Namespace) -> int:
     cmd = args.command
-    if cmd == "gacpd-manifest":
-        from dde.gacpd import draft_manifest
-
-        n, problems = draft_manifest(args.gacpd_run, args.out)
-        for p in problems:
-            log.warning("%s", p)
-        log.info("wrote %d draft cases to %s", n, args.out)
-        return 0
-
     if cmd == "validate":
         from dde.validate import validate
 
@@ -128,20 +113,6 @@ def _dispatch(args: argparse.Namespace) -> int:
         for path in validate(args.indicators, args.codes, args.out, args.coder, args.map):
             log.info("wrote %s", path)
         return 0
-
-    if cmd == "setup-repos":
-        from dde.git import GitError, setup_pair_repo
-
-        pairs = {(c.variant_pair, c.source_repo, c.target_repo) for c in load_manifest(args.manifest)}
-        failed = 0
-        for pair, src, tgt in sorted(pairs):
-            log.info("setting up %s", pair)
-            try:
-                setup_pair_repo(args.repos / pair, src, tgt)
-            except GitError as exc:
-                failed += 1
-                log.error("%s: %s", pair, exc)
-        return 1 if failed else 0
 
     cases = _cases(args)
     log.info("%d case(s) selected", len(cases))
@@ -151,7 +122,7 @@ def _dispatch(args: argparse.Namespace) -> int:
         from dde.pipeline import Settings, verify_case
 
         settings = Settings(args.repos, None, Path("."))
-        results = [verify_case(c, settings, check_fix=True) for c in cases]
+        results = [verify_case(c, settings) for c in cases]
         path = args.out / "case_status.csv"
         write_csv(path, status_rows(results), BASE_COLUMNS["case_status.csv"])
         stopped = sum(r.stopped for r in results)
