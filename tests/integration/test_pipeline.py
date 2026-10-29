@@ -174,19 +174,3 @@ def test_refactoringminer_cache_reuses_wider_range(
     monkeypatch.setenv("FAKE_RM_FAIL", "1")  # proves the cache answered
     narrow = run_range(fake_rm, repo, scenario.ancestor, narrow_end, cache)
     assert [c["sha1"] for c in narrow] == [c["sha1"] for c in wide[:2]]
-
-
-def test_verify_reverifies_mo_status_at_target(scenario: Scenario, tmp_path: Path) -> None:
-    """Stage A: a fix the target already has is flagged by verify; a partial one is not."""
-    from scenario import commit, git
-
-    git(scenario.repo, "checkout", "-q", "target")
-    w = scenario.repo / P / "io" / "Writer.java"
-    w.write_text(w.read_text().replace("System.out.println(s);", "System.out.println(s.trim());"))
-    fixed_target = commit(scenario.repo, "independent fix", "2024-04-15T00:00:00Z")
-    m = manifest(scenario, tmp_path / "cases.csv", target_pre_sha=fixed_target,
-                 repatch_target_sha=fixed_target)
-    assert main(["verify", "--manifest", str(m), "--repos", str(scenario.repo.parent),
-                 "--out", str(tmp_path / "v")]) == 0
-    fix = [r for r in rows(tmp_path / "v" / "case_status.csv") if r["flag"] == "fix_possibly_present"]
-    assert len(fix) == 1 and fix[0]["detail"].startswith(f"{P}/Writer.java")

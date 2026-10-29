@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dde"
-version = "0.1.1"
-description = "Design-Divergence Extractor: design-divergence indicators for the Beyond Refactorings study."
+version = "0.2.0"
+description = "Design-Divergence Extractor (dde) and its data-preparation companion (dde-prep), for the Beyond Refactorings study."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "UNLV EVOL" }]
@@ -16,10 +16,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6", "mypy>=1.11"]
+# dde-prep only: the pilot workbooks. dde itself never needs it.
+prep = ["openpyxl>=3.1,<4"]
+dev = ["openpyxl>=3.1,<4", "pytest>=8", "pytest-cov>=5", "ruff>=0.6", "mypy>=1.11"]
 
 [project.scripts]
 dde = "dde.cli:main"
+dde-prep = "dde_prep.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -42,11 +45,15 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.mypy]
 python_version = "3.11"
 mypy_path = "src"
-packages = ["dde"]
+packages = ["dde", "dde_prep"]
 warn_unused_ignores = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
 
 [tool.coverage.run]
-source = ["dde"]
+source = ["dde", "dde_prep"]
 branch = true
+
+[tool.ruff.lint.per-file-ignores]
+# long user-facing strings (sheet legends, report lines)
+"src/dde_prep/pilot/*.py" = ["E501"]

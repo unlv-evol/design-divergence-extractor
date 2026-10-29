@@ -5,4 +5,4 @@ its target counterpart, for the Beyond Refactorings study. See
 ``docs/extractor-spec.pdf`` (the authority) and ``docs/decisions.md``.
 """
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"

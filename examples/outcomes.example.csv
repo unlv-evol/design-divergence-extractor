@@ -1,0 +1,2 @@
+case_id,variant_pair,pr_number,repatch_case_id,source_commits,target_sha,git_status,git_conflicting_files,repatch_status,repatch_remaining_conflicting_files,level,notes
+apache_kafka--linkedin_kafka-PR12535,apache_kafka--linkedin_kafka,12535,<RePatch case id>,<sha;sha>,<40-hex sha>,conflict,streams/src/.../CombinedKey.java,completed,,L2,example row; delete

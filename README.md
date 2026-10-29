@@ -1,4 +1,13 @@
-# dde — Design-Divergence Extractor
+# dde and dde-prep
+
+This repository holds two tools, released together:
+
+- **`dde`, the Design-Divergence Extractor**: computes indicators from a finished case manifest. It
+  never reads outcomes.
+- **`dde-prep`**: everything that prepares `dde`'s inputs (workplan Stage A) and supports the coding
+  pilot. It may read RePatch results; `dde` never imports it, and a test enforces that.
+
+## dde — Design-Divergence Extractor
 
 `dde` computes the design-divergence indicators (I1–I8) for the *Beyond Refactorings* study:
 for each directed patch-transfer attempt, it compares the code a bug fix edits in the source
@@ -20,33 +29,49 @@ make dev        # pinned dependencies + editable install
 make check      # ruff, mypy, pytest: what CI runs
 ```
 
-Runtime dependencies are only `tree-sitter` and `tree-sitter-java`, pinned in `requirements.lock`.
+Runtime dependencies of `dde` are only `tree-sitter` and `tree-sitter-java`, pinned in
+`requirements.lock`. `dde-prep`'s pilot commands also need `openpyxl` (`pip install -e ".[prep]"`).
 
 ## Workflow
 
+**1. Prepare the data (Stage A) with `dde-prep`.** Outcomes stay in `restricted/`.
+
+```bash
+dde-prep draft        --gacpd-run data/gacpd --out cases.csv          # one row per GACPD PR, duplicates marked
+dde-prep setup-repos  --cases cases.csv --repos repos/                 # one repository per pair (network)
+# fill restricted/outcomes.csv: one row per RePatch PR (examples/outcomes.example.csv)
+dde-prep apply-shas   --cases cases.csv --runs restricted/outcomes.csv --repos repos/
+dde-prep reverify     --cases cases.csv --repos repos/ --out verify/   # add --apply for missing commits
+dde-prep check        --cases cases.csv                                # ready for dde?
+dde-prep checkpoint1  --cases cases.csv --runs restricted/outcomes.csv --status verify/case_status.csv
+```
+
+`apply-shas` reads only the commit columns of the runs: `source_post_sha` is the last commit
+RePatch cherry-picked, `source_pre_sha` the parent of the first, and both target columns are the
+run's target. Pending cases with a run become `eligible`; without one, `characterization_only`.
+`reverify` adds Stage A's MO re-check (`fix_possibly_present`, `mo_file_without_target_counterpart`)
+to `dde verify`; those flags need a person's decision. `checkpoint1` re-derives each level from the
+raw fields, writes the Checkpoint 1 report, and proposes the pilot sample
+(`checkpoint1/pilot_cases.csv`, ids only; levels in `restricted/pilot_strata.csv`).
+
+Until a reader for RePatch's released logs exists, `restricted/outcomes.csv` is filled by hand.
+
+**2. Extract with `dde`.**
+
 ```bash
 export DDE_REFACTORINGMINER=$PWD/tools/RefactoringMiner-3.1.6/bin/RefactoringMiner
+dde verify       --manifest cases.csv --repos repos/ --out out/        # revisions and patch files
+dde refactorings --manifest cases.csv --repos repos/                   # fill the RefactoringMiner cache
+dde packets      --manifest cases.csv --repos repos/ --out packets/    # blind pass-1 packets
+dde extract      --manifest cases.csv --repos repos/ --out out/ [--cases C01,C02]
+```
 
-# Stage A helper: draft cases.csv from a GACPD run (SHAs and eligibility are left for Stage A)
-dde gacpd-manifest --gacpd-run data/gacpd --out cases.draft.csv
+**3. Pilot coding and validation.**
 
-# One working repository per variant pair, with both histories (the only network step)
-dde setup-repos --manifest cases.csv --repos repos/
-
-# Check revisions first: SHAs present, target SHA equals RePatch's, patch files match the manifest
-dde verify --manifest cases.csv --repos repos/ --out out/
-
-# Fill the RefactoringMiner cache ahead of time (slow on long histories; runs unattended)
-dde refactorings --manifest cases.csv --repos repos/
-
-# Blind packets for pass-1 coding (stages 1-6; no indicator values)
-dde packets --manifest cases.csv --repos repos/ --out packets/
-
-# Indicators, aggregates, audit trail (stages 1-8)
-dde extract --manifest cases.csv --repos repos/ --out out/ [--cases C01,C02]
-
-# After pass-1 codes are frozen: indicator vs. code evidence for workplan Section 8
-dde validate --indicators out/indicators_patch.csv --codes codes.csv --out out/
+```bash
+dde-prep pilot-sheets pilot --coder coderA --packets packets/ --cases checkpoint1/pilot_cases.csv --out coding_coderA.xlsx
+dde-prep pilot-agreement --a coding_coderA.xlsx --b coding_coderB.xlsx [--consensus coding_consensus.xlsx] --out agreement/
+dde validate --indicators out/indicators_patch.csv --codes agreement/codes_long.csv --out out/
 ```
 
 Only cases whose `eligibility` is `eligible` run unless `--include-ineligible` is given.
@@ -86,8 +111,8 @@ One module per pipeline stage, no framework:
 ```
 src/dde/
   cli.py          command line
-  manifest.py     cases.csv reading and the outcome-column guard
-  git.py          read-only git wrapper; per-pair repository setup
+  manifest.py     cases.csv schema (owned here), reading, and the outcome-column guard
+  git.py          read-only git wrapper
   revisions.py    stage 1: SHAs, R2 check, ancestor
   diff.py         stage 2: unified diff into files and hunks
   refminer.py     stage 3: RefactoringMiner runs, cache, two-sided rename maps
@@ -100,10 +125,20 @@ src/dde/
   outputs.py      deterministic CSV/JSON writers
   packets.py      coder packets
   validate.py     indicators vs. frozen codes
-  gacpd.py        draft manifest from a GACPD run
   models.py       shared dataclasses and the State enum
+src/dde_prep/     data preparation; may read outcomes; dde never imports it
+  cli.py          command line
+  gacpd.py        draft the manifest from a GACPD run
+  repos.py        per-pair working repositories
+  runs.py         restricted RePatch runs table; level derivation
+  shas.py         revisions from the runs into the manifest
+  check.py        manifest consistency
+  reverify.py     dde verify plus MO re-verification at the target
+  checkpoint.py   Checkpoint 1 report and pilot sampling
+  pilot/          coding workbooks and agreement (kappa, codes for dde validate)
 tests/
-  unit/           per-module tests; R1 and R3 checks in test_requirements.py
+  unit/           per-module tests; R1, R3 and the dde/dde-prep boundary in test_requirements.py
+  prep/           dde-prep tests
   integration/    end to end on a generated fork scenario (git, no network)
   scenario.py     the workplan's example as a real repository
   fake_refactoringminer.py   stand-in emitting RefactoringMiner 3.x JSON

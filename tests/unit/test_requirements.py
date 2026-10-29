@@ -33,6 +33,16 @@ def test_r1_no_salp_imports_or_sap_inputs() -> None:
         assert not re.search(r"sap[-_][\w]*\.json|sap_manifest|\.sap\b", text, re.I), path
 
 
+def test_dde_never_imports_dde_prep() -> None:
+    """dde-prep may read outcomes; dde must have no code path to it."""
+    for path in _python_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            names = ([a.name for a in node.names] if isinstance(node, ast.Import)
+                     else [node.module or ""] if isinstance(node, ast.ImportFrom) else [])
+            assert not any(n.split(".")[0] == "dde_prep" for n in names), path
+
+
 def test_r1_dependencies_are_the_allowed_ones() -> None:
     pyproject = (SRC.parents[1] / "pyproject.toml").read_text(encoding="utf-8")
     block = pyproject.split("dependencies = [", 1)[1].split("]", 1)[0]

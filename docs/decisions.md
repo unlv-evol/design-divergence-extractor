@@ -67,3 +67,15 @@ be confirmed before full extraction.
   `refactorings.csv` so coders can see them, but they do not enter rename maps.
 - **GACPD records no SHAs.** `gacpd-manifest` leaves them empty. Stage A must fill source pre/post
   (PR head or merge commit, to be decided) and the target SHA from RePatch's logs.
+
+## Tool boundary (0.2.0)
+
+18. **`dde` and `dde-prep` are separate packages in one repository.** `dde-prep` may read RePatch
+    results; `dde` must not (R3), and `tests/unit/test_requirements.py` fails if any `dde` module
+    imports `dde_prep`. The manifest is the only artifact that crosses, and `dde.manifest` owns
+    its schema so the two cannot drift.
+19. **`reverify --apply` decides only what needs no judgement**: cases whose commits are missing
+    from the repository become `excluded: sha_not_in_repository`. `fix_possibly_present` and
+    `mo_file_without_target_counterpart` stay flags for a person.
+20. **`restricted/outcomes.csv` is filled by hand** until a reader for RePatch's released logs is
+    written; that needs a sample of the logs.

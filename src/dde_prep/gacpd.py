@@ -1,4 +1,4 @@
-"""Draft a case manifest from a GACPD run (helper for workplan Stage A).
+"""``dde-prep draft``: a case manifest from a GACPD run (workplan Stage A).
 
 GACPD records which files of a pull request are missed opportunities (MO) and
 which are not (NA, ED). It records no commit SHAs, so the draft leaves every
@@ -18,8 +18,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from dde.manifest import REQUIRED_COLUMNS
-from dde.outputs import write_csv
+from dde.manifest import write_manifest
 
 _RESULTS_NAMES = ("results.json", "results.josn")
 
@@ -62,28 +61,44 @@ def draft_manifest(run_dir: Path, out: Path) -> tuple[int, list[str]]:
         if not (source and target):
             problems.append(f"{pr_dir}: no results.json names the repository pair")
         files = rec.get("files") or []
-        mo = sorted(str(f["fileName"]) for f in files
-                    if str(f.get("classification", "")).upper() == "MO")
-        non_mo = sorted(str(f["fileName"]) for f in files
-                        if str(f.get("classification", "")).upper() != "MO")
+        mo = sorted(str(f["fileName"]) for f in files if str(f.get("classification", "")).upper() == "MO")
+        non_mo = sorted(str(f["fileName"]) for f in files if str(f.get("classification", "")).upper() != "MO")
         pair = f"{_slug(source)}--{_slug(target)}" if source and target else pr_dir.parent.name
-        rows.append({
-            "case_id": f"{pair}-PR{pr}",
-            "mo_id": f"{pr_dir.parent.name}/{pr_dir.name}",
-            "variant_pair": pair,
-            "direction": f"{source} -> {target}",
-            "source_repo": f"https://github.com/{source}" if source else "",
-            "target_repo": f"https://github.com/{target}" if target else "",
-            "pr_number": pr,
-            "source_pre_sha": "", "source_post_sha": "", "target_pre_sha": "",
-            "repatch_target_sha": "", "ancestor_sha": "",
-            "mo_files": ";".join(mo),
-            "non_mo_files": ";".join(non_mo),
-            "eligibility": "pending",
-            "exclusion_reason": "",
-            "gacpd_divergence_date": rec.get("repoDivergenceDate", ""),
-            "gacpd_cutoff_date": rec.get("cutoffDate", ""),
-            "gacpd_added_files_skipped": ";".join(sorted(rec.get("addedFilesSkipped") or [])),
-        })
-    write_csv(out, rows, list(REQUIRED_COLUMNS))
+        rows.append(
+            {
+                "case_id": f"{pair}-PR{pr}",
+                "mo_id": f"{pr_dir.parent.name}/{pr_dir.name}",
+                "variant_pair": pair,
+                "direction": f"{source} -> {target}",
+                "source_repo": f"https://github.com/{source}" if source else "",
+                "target_repo": f"https://github.com/{target}" if target else "",
+                "pr_number": pr,
+                "source_pre_sha": "",
+                "source_post_sha": "",
+                "target_pre_sha": "",
+                "repatch_target_sha": "",
+                "ancestor_sha": "",
+                "mo_files": ";".join(mo),
+                "non_mo_files": ";".join(non_mo),
+                "eligibility": "pending",
+                "exclusion_reason": "",
+                "gacpd_divergence_date": rec.get("repoDivergenceDate", ""),
+                "gacpd_cutoff_date": rec.get("cutoffDate", ""),
+                "gacpd_added_files_skipped": ";".join(sorted(rec.get("addedFilesSkipped") or [])),
+            }
+        )
+    _mark_duplicates(rows)
+    write_manifest(out, rows)
     return len(rows), problems
+
+
+def _mark_duplicates(rows: list[dict[str, Any]]) -> None:
+    """Same pair and PR twice: keep the first, exclude the rest under a unique case_id."""
+    seen: dict[tuple[str, str], int] = {}
+    for r in rows:
+        key = (r["variant_pair"], r["pr_number"])
+        seen[key] = seen.get(key, 0) + 1
+        if seen[key] > 1:
+            r["case_id"] = f"{r['case_id']}-dup{seen[key]}"
+            r["eligibility"] = "excluded"
+            r["exclusion_reason"] = "duplicate_mo"
